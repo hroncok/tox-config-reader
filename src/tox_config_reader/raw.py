@@ -9,6 +9,12 @@ Supports the following formats (in priority order):
 5. tox.toml (TOML)
 
 See: https://tox.wiki/en/stable/config.html#discovery-and-file-types
+
+All readers return a normalized dictionary structure matching the TOML format:
+- Core settings at root level (env_list, requires, etc.)
+- env_run_base: base configuration for run environments
+- env_pkg_base: base configuration for package environments
+- env: dict mapping environment names to their specific configuration
 """
 
 from __future__ import annotations
@@ -43,10 +49,16 @@ class BaseConfigReader(ABC):
     @abstractmethod
     def read(self) -> dict[str, Any]:
         """
-        Read the configuration and return it as a dictionary.
+        Read the configuration and return it as a normalized dictionary.
+
+        The returned dictionary uses the TOML structure as canonical form:
+        - Core settings at root level (env_list, requires, etc.)
+        - env_run_base: base configuration for run environments
+        - env_pkg_base: base configuration for package environments
+        - env: dict mapping environment names to their specific configuration
 
         Returns:
-            Dictionary containing the parsed configuration.
+            Dictionary containing the parsed and normalized configuration.
         """
         ...
 
@@ -70,18 +82,16 @@ class INIConfigReader(BaseConfigReader):
 
     #: Section name for core tox settings
     core_section: str = "tox"
-    #: Prefix for environment sections (e.g., "testenv" -> "testenv:py39")
-    env_section_prefix: str = "testenv"
 
     def _parse_ini(self, content: str) -> dict[str, Any]:
         """
-        Parse INI content into a dictionary.
+        Parse INI content into a raw dictionary.
 
         Args:
             content: INI formatted string.
 
         Returns:
-            Dictionary with parsed configuration.
+            Dictionary with raw parsed configuration.
         """
         parser = configparser.ConfigParser(interpolation=None)
         parser.read_string(content)
@@ -93,10 +103,52 @@ class INIConfigReader(BaseConfigReader):
 
         return result
 
+    def _normalize(self, raw: dict[str, Any]) -> dict[str, Any]:
+        """
+        Normalize INI configuration to match TOML structure.
+
+        Transforms:
+        - [tox] or [tox:tox] → root level
+        - [testenv] → env_run_base
+        - [pkgenv] → env_pkg_base
+        - [testenv:name] → env["name"]
+
+        Args:
+            raw: Raw parsed INI configuration.
+
+        Returns:
+            Normalized configuration dictionary.
+        """
+        result: dict[str, Any] = {}
+
+        # Extract core settings to root level
+        if self.core_section in raw:
+            result.update(raw[self.core_section])
+
+        # Extract base environment config
+        if "testenv" in raw:
+            result["env_run_base"] = raw["testenv"]
+
+        if "pkgenv" in raw:
+            result["env_pkg_base"] = raw["pkgenv"]
+
+        # Extract named environments
+        env: dict[str, Any] = {}
+        for section, values in raw.items():
+            if section.startswith("testenv:"):
+                env_name = section[len("testenv:"):]
+                env[env_name] = values
+
+        if env:
+            result["env"] = env
+
+        return result
+
     def read(self) -> dict[str, Any]:
-        """Read and parse the INI configuration file."""
+        """Read, parse, and normalize the INI configuration file."""
         content = self.path.read_text(encoding="utf-8")
-        return self._parse_ini(content)
+        raw = self._parse_ini(content)
+        return self._normalize(raw)
 
     @classmethod
     def can_read(cls, path: Path) -> bool:
@@ -216,7 +268,7 @@ class PyprojectTOMLConfigReader(TOMLConfigReader):
         return bool(tool_tox) and "legacy_tox_ini" not in tool_tox
 
 
-class PyprojectLegacyINIConfigReader(BaseConfigReader):
+class PyprojectLegacyINIConfigReader(INIConfigReader):
     """
     Reader for pyproject.toml with legacy_tox_ini key.
 
@@ -225,20 +277,13 @@ class PyprojectLegacyINIConfigReader(BaseConfigReader):
     """
 
     def read(self) -> dict[str, Any]:
-        """Read TOML file and parse the embedded INI configuration."""
+        """Read TOML file, extract and parse the embedded INI configuration."""
         content = self.path.read_text(encoding="utf-8")
         data = tomli.loads(content)
         ini_content = data.get("tool", {}).get("tox", {}).get("legacy_tox_ini", "")
 
-        # Parse the INI content
-        parser = configparser.ConfigParser(interpolation=None)
-        parser.read_string(ini_content)
-
-        result: dict[str, Any] = {}
-        for section in parser.sections():
-            result[section] = dict(parser[section])
-
-        return result
+        raw = self._parse_ini(ini_content)
+        return self._normalize(raw)
 
     @classmethod
     def can_read(cls, path: Path) -> bool:
@@ -295,13 +340,18 @@ def read_config(directory: Path | None = None) -> dict[str, Any]:
     Read tox configuration from the appropriate file.
 
     Discovers and reads the tox configuration file from the given directory,
-    following the standard tox priority order.
+    following the standard tox priority order. Returns a normalized dictionary
+    structure regardless of the source format.
 
     Args:
         directory: Directory to search in. Defaults to current working directory.
 
     Returns:
-        Dictionary containing the parsed tox configuration.
+        Dictionary containing the parsed tox configuration with normalized structure:
+        - Core settings at root level (env_list, requires, etc.)
+        - env_run_base: base configuration for run environments
+        - env_pkg_base: base configuration for package environments
+        - env: dict mapping environment names to their specific configuration
 
     Raises:
         FileNotFoundError: If no tox configuration file is found.
@@ -309,4 +359,3 @@ def read_config(directory: Path | None = None) -> dict[str, Any]:
     path, reader_class = find_config_file(directory)
     reader = reader_class(path)
     return reader.read()
-

@@ -179,11 +179,10 @@ class TestToxINIConfigReader:
         reader = ToxINIConfigReader(tox_ini)
         config = reader.read()
 
-        assert "tox" in config
-        assert config["tox"]["env_list"] == "py39, py310, py311"
-        assert "testenv" in config
-        assert config["testenv"]["deps"] == "pytest"
-        assert config["testenv"]["commands"] == "pytest tests"
+        assert config["env_list"] == "py39, py310, py311"
+        assert "env_run_base" in config
+        assert config["env_run_base"]["deps"] == "pytest"
+        assert config["env_run_base"]["commands"] == "pytest tests"
 
 
 class TestSetupCfgConfigReader:
@@ -205,10 +204,9 @@ class TestSetupCfgConfigReader:
         reader = SetupCfgConfigReader(setup_cfg)
         config = reader.read()
 
-        assert "tox:tox" in config
-        assert config["tox:tox"]["env_list"] == "py39, py310"
-        assert "testenv" in config
-        assert config["testenv"]["deps"] == "pytest"
+        assert config["env_list"] == "py39, py310"
+        assert "env_run_base" in config
+        assert config["env_run_base"]["deps"] == "pytest"
 
 
 class TestToxTOMLConfigReader:
@@ -282,10 +280,9 @@ class TestPyprojectLegacyINIConfigReader:
         reader = PyprojectLegacyINIConfigReader(pyproject_legacy)
         config = reader.read()
 
-        assert "tox" in config
-        assert config["tox"]["env_list"] == "py39, py310"
-        assert "testenv" in config
-        assert config["testenv"]["deps"] == "pytest"
+        assert config["env_list"] == "py39, py310"
+        assert "env_run_base" in config
+        assert config["env_run_base"]["deps"] == "pytest"
 
 
 class TestFindConfigFile:
@@ -368,13 +365,13 @@ class TestConfigPriority:
 class TestReadConfig:
     def test_read_tox_ini(self, tox_ini):
         config = read_config(tox_ini.parent)
-        assert "tox" in config
-        assert "testenv" in config
+        assert "env_list" in config
+        assert "env_run_base" in config
 
     def test_read_setup_cfg(self, setup_cfg):
         config = read_config(setup_cfg.parent)
-        assert "tox:tox" in config
-        assert "testenv" in config
+        assert "env_list" in config
+        assert "env_run_base" in config
 
     def test_read_tox_toml(self, tox_toml):
         config = read_config(tox_toml.parent)
@@ -388,8 +385,8 @@ class TestReadConfig:
 
     def test_read_pyproject_legacy(self, pyproject_legacy):
         config = read_config(pyproject_legacy.parent)
-        assert "tox" in config
-        assert "testenv" in config
+        assert "env_list" in config
+        assert "env_run_base" in config
 
     def test_raises_when_no_config(self, tmp_path):
         with pytest.raises(FileNotFoundError):
