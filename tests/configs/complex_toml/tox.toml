@@ -1,0 +1,29 @@
+requires = ["tox>=4.0", "tox-uv"]
+env_list = ["3.9", "3.10", "3.11", "3.12", "3.13", "lint", "type"]
+
+[env_run_base]
+description = "Run tests under Python {base_python}"
+dependency_groups = ["test"]
+commands = [["pytest", "-v"]]
+
+[env_pkg_base]
+pass_env = ["HOME", "USER"]
+
+[env.lint]
+description = "Run linters"
+deps = ["ruff>=0.4"]
+commands = [
+    ["ruff", "check", "src"],
+    ["ruff", "format", "--check", "src"],
+]
+
+[env.type]
+description = "Run type checker"
+deps = ["mypy>=1.10", "types-requests"]
+commands = [["mypy", "src"]]
+
+[env.docs]
+description = "Build documentation"
+deps = ["sphinx", "furo"]
+commands = [["sphinx-build", "-b", "html", "docs", "docs/_build"]]
+

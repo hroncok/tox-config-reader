@@ -1,0 +1,7 @@
+requires = ["tox>=4.0"]
+env_list = ["py39", "py310", "py311"]
+
+[env_run_base]
+description = "Run tests"
+commands = [["pytest"]]
+

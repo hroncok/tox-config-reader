@@ -1,0 +1,22 @@
+{
+    "env_list": "py39, py310, py311, lint, type",
+    "requires": "tox>=4.0",
+    "skip_missing_interpreters": "true",
+    "env_run_base": {
+        "deps": "\npytest\npytest-cov",
+        "commands": "pytest --cov=src tests"
+    },
+    "env_pkg_base": {
+        "pass_env": "HOME"
+    },
+    "env": {
+        "lint": {
+            "deps": "ruff",
+            "commands": "ruff check src"
+        },
+        "type": {
+            "deps": "\nmypy\ntypes-requests",
+            "commands": "mypy src"
+        }
+    }
+}
