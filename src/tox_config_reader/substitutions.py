@@ -28,6 +28,7 @@ See also:
 TOML inline table substitutions are also supported:
 - { replace = "posargs", default = ["a", "b"], extend = true }
 - { replace = "env", name = "VAR", default = "fallback" }
+- { replace = "ref", of = ["env_run_base", "deps"] }
 """
 
 from __future__ import annotations
@@ -258,6 +259,31 @@ def _resolve_ini_section_reference(
     return None
 
 
+def _get_value_by_path(
+    parts: list[str],
+    config: dict[str, Any],
+) -> Any | None:
+    """
+    Get a value from config by a list of path parts.
+
+    Args:
+        parts: List of keys to traverse (e.g., ["env_run_base", "deps"]).
+        config: The full config dict.
+
+    Returns:
+        The value at the path, or None if not found.
+    """
+    current: Any = config
+
+    for part in parts:
+        if isinstance(current, dict) and part in current:
+            current = current[part]
+        else:
+            return None
+
+    return current
+
+
 def _resolve_dotted_reference(
     path: str,
     config: dict[str, Any],
@@ -273,16 +299,10 @@ def _resolve_dotted_reference(
         The resolved value as string, or None if not found.
     """
     parts = path.split(".")
-    current: Any = config
+    result = _get_value_by_path(parts, config)
 
-    for part in parts:
-        if isinstance(current, dict) and part in current:
-            current = current[part]
-        else:
-            return None
-
-    if isinstance(current, str):
-        return current
+    if isinstance(result, str):
+        return result
 
     return None
 
@@ -546,6 +566,17 @@ def _resolve_toml_inline_substitution(
         env_value = os.environ.get(env_name)
         if env_value is not None:
             return env_value, extend
+        if default is not None:
+            return default, extend
+        return "", extend
+
+    if replace_type == "ref":
+        # Configuration reference: { replace = "ref", of = ["env_run_base", "deps"] }
+        of = spec.get("of", [])
+        if isinstance(of, list) and of:
+            ref_value = _get_value_by_path(of, config)
+            if ref_value is not None:
+                return ref_value, extend
         if default is not None:
             return default, extend
         return "", extend

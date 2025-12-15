@@ -485,6 +485,94 @@ class TestTOMLInlineSubstitution:
             ["cmd2", "arg1", "arg2"],
         ]
 
+    def test_ref_inline_basic(self):
+        config = {
+            "env_run_base": {
+                "deps": ["pytest", "coverage"]
+            },
+            "env": {
+                "lint": {
+                    "deps": [{"replace": "ref", "of": ["env_run_base", "deps"]}]
+                }
+            }
+        }
+        result = substitute_config(config)
+        assert result["env"]["lint"]["deps"] == [["pytest", "coverage"]]
+
+    def test_ref_inline_extend(self):
+        config = {
+            "env_run_base": {
+                "deps": ["pytest", "coverage"]
+            },
+            "env": {
+                "lint": {
+                    "deps": [{"replace": "ref", "of": ["env_run_base", "deps"], "extend": True}, "ruff"]
+                }
+            }
+        }
+        result = substitute_config(config)
+        assert result["env"]["lint"]["deps"] == ["pytest", "coverage", "ruff"]
+
+    def test_ref_inline_with_default(self):
+        config = {
+            "env": {
+                "lint": {
+                    "deps": [{"replace": "ref", "of": ["nonexistent", "key"], "default": "fallback-dep"}]
+                }
+            }
+        }
+        result = substitute_config(config)
+        assert result["env"]["lint"]["deps"] == ["fallback-dep"]
+
+    def test_ref_inline_with_default_list(self):
+        config = {
+            "env": {
+                "lint": {
+                    "deps": [{"replace": "ref", "of": ["nonexistent"], "default": ["a", "b"], "extend": True}]
+                }
+            }
+        }
+        result = substitute_config(config)
+        assert result["env"]["lint"]["deps"] == ["a", "b"]
+
+    def test_ref_inline_nested_path(self):
+        config = {
+            "env": {
+                "base": {
+                    "commands": [["pytest"]]
+                },
+                "extended": {
+                    "commands": [{"replace": "ref", "of": ["env", "base", "commands"]}]
+                }
+            }
+        }
+        result = substitute_config(config)
+        assert result["env"]["extended"]["commands"] == [[["pytest"]]]
+
+    def test_ref_inline_nested_path_extend(self):
+        config = {
+            "env": {
+                "base": {
+                    "commands": [["pytest"]]
+                },
+                "extended": {
+                    "commands": [{"replace": "ref", "of": ["env", "base", "commands"], "extend": True}]
+                }
+            }
+        }
+        result = substitute_config(config)
+        assert result["env"]["extended"]["commands"] == [["pytest"]]
+
+    def test_ref_inline_string_value(self):
+        config = {
+            "base_python": "python3.11",
+            "env_run_base": {
+                "base_python": {"replace": "ref", "of": ["base_python"]}
+            }
+        }
+        result = substitute_config(config)
+        assert result["env_run_base"]["base_python"] == "python3.11"
+
 
 class TestEdgeCases:
     def test_unknown_substitution_preserved(self):
