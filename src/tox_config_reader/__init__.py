@@ -14,6 +14,11 @@ from tox_config_reader.raw import (
     find_config_file,
     read_config,
 )
+from tox_config_reader.substitutions import (
+    substitute_config,
+    substitute_string,
+    substitute_value,
+)
 
 __all__ = [
     "BaseConfigReader",
@@ -26,5 +31,8 @@ __all__ = [
     "PyprojectLegacyINIConfigReader",
     "find_config_file",
     "read_config",
+    "substitute_config",
+    "substitute_string",
+    "substitute_value",
 ]
 
