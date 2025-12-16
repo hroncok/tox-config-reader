@@ -20,7 +20,7 @@ config = read_config()
 config = read_config(Path("/path/to/project"))
 
 # Or use a specific reader directly
-from tox_config_reader import ToxINIConfigReader
+from tox_config_reader.raw import ToxINIConfigReader
 reader = ToxINIConfigReader(Path("tox.ini"))
 config = reader.read()
 ```
