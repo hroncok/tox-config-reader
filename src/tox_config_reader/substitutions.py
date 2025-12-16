@@ -106,18 +106,25 @@ def _find_substitutions(text: str) -> list[tuple[int, int, str]]:
     return results
 
 
-def _substitute_env(key: str, default: str | None = None) -> str:
+def _substitute_env(
+    key: str,
+    default: str | None = None,
+    environ: dict[str, str] | None = None,
+) -> str:
     """
     Substitute an environment variable.
 
     Args:
         key: Environment variable name.
         default: Default value if variable is not set.
+        environ: Environment dictionary to use (defaults to os.environ).
 
     Returns:
         The environment variable value or default.
     """
-    value = os.environ.get(key)
+    if environ is None:
+        environ = os.environ
+    value = environ.get(key)
     if value is not None:
         return value
     if default is not None:
@@ -381,16 +388,18 @@ def _parse_substitution(expr: str) -> tuple[str, list[str]]:
 
 def _substitute_single(
     expr: str,
-    posargs: list[str],
     config: dict[str, Any],
+    posargs: list[str],
+    environ: dict[str, str],
 ) -> str:
     """
     Perform a single substitution.
 
     Args:
         expr: The expression inside braces.
-        posargs: Positional arguments from user.
         config: The full config dict for reference substitutions.
+        posargs: Positional arguments from user.
+        environ: Environment dictionary to use.
 
     Returns:
         The substituted value.
@@ -423,8 +432,8 @@ def _substitute_single(
         default = args[1] if len(args) > 1 else None
         # Recursively substitute the default value
         if default is not None:
-            default = substitute_string(default, posargs, config)
-        return _substitute_env(key, default)
+            default = substitute_string(default, config=config, posargs=posargs, environ=environ)
+        return _substitute_env(key, default, environ)
 
     # Handle posargs with optional index: {posargs}, {posargs[0]}, {posargs[1:]}
     if sub_type == "posargs" or sub_type.startswith("posargs["):
@@ -440,7 +449,7 @@ def _substitute_single(
         default = args[0] if args else None
         # Recursively substitute the default value
         if default is not None:
-            default = substitute_string(default, posargs, config)
+            default = substitute_string(default, config=config, posargs=posargs, environ=environ)
         return _substitute_posargs(posargs, default)
 
     if sub_type == "tty":
@@ -468,24 +477,29 @@ def _substitute_single(
 
 def substitute_string(
     value: str,
-    posargs: list[str] | None = None,
+    *,
     config: dict[str, Any] | None = None,
+    posargs: list[str] | None = None,
+    environ: dict[str, str] | None = None,
 ) -> str:
     """
     Perform substitutions on a single string value.
 
     Args:
         value: The string to substitute.
-        posargs: Positional arguments from user.
         config: The full config dict for reference substitutions.
+        posargs: Positional arguments from user.
+        environ: Environment dictionary to use (defaults to os.environ).
 
     Returns:
         The string with substitutions applied.
     """
-    if posargs is None:
-        posargs = []
     if config is None:
         config = {}
+    if posargs is None:
+        posargs = []
+    if environ is None:
+        environ = dict(os.environ)
 
     # Process substitutions iteratively to handle nested ones
     max_iterations = 10  # Prevent infinite loops
@@ -500,7 +514,7 @@ def substitute_string(
         # (to preserve indices)
         substitutions = _find_substitutions(value)
         for start, end, expr in reversed(substitutions):
-            replacement = _substitute_single(expr, posargs, config)
+            replacement = _substitute_single(expr, config, posargs, environ)
             value = value[:start] + replacement + value[end:]
 
     # Handle escaped braces
@@ -527,8 +541,9 @@ def _is_toml_inline_substitution(value: Any) -> bool:
 
 def _resolve_toml_inline_substitution(
     spec: dict[str, Any],
-    posargs: list[str],
     config: dict[str, Any],
+    posargs: list[str],
+    environ: dict[str, str],
 ) -> tuple[Any, bool]:
     """
     Resolve a TOML inline table substitution.
@@ -539,8 +554,9 @@ def _resolve_toml_inline_substitution(
 
     Args:
         spec: The substitution specification dict.
-        posargs: Positional arguments from user.
         config: The full config dict.
+        posargs: Positional arguments from user.
+        environ: Environment dictionary to use.
 
     Returns:
         Tuple of (resolved_value, extend_flag).
@@ -563,7 +579,7 @@ def _resolve_toml_inline_substitution(
 
     if replace_type == "env":
         env_name = spec.get("name", "")
-        env_value = os.environ.get(env_name)
+        env_value = environ.get(env_name)
         if env_value is not None:
             return env_value, extend
         if default is not None:
@@ -576,9 +592,13 @@ def _resolve_toml_inline_substitution(
         if isinstance(of, list) and of:
             ref_value = _get_value_by_path(of, config)
             if ref_value is not None:
-                return ref_value, extend
+                # Auto-extend if the referenced value is a list
+                should_extend = extend or isinstance(ref_value, list)
+                return ref_value, should_extend
         if default is not None:
-            return default, extend
+            # Auto-extend if the default value is a list
+            should_extend = extend or isinstance(default, list)
+            return default, should_extend
         return "", extend
 
     # Unknown replace type, return spec as-is
@@ -587,8 +607,10 @@ def _resolve_toml_inline_substitution(
 
 def substitute_value(
     value: Any,
-    posargs: list[str] | None = None,
+    *,
     config: dict[str, Any] | None = None,
+    posargs: list[str] | None = None,
+    environ: dict[str, str] | None = None,
 ) -> Any:
     """
     Perform substitutions on a value of any type.
@@ -599,40 +621,43 @@ def substitute_value(
 
     Args:
         value: The value to substitute.
-        posargs: Positional arguments from user.
         config: The full config dict for reference substitutions.
+        posargs: Positional arguments from user.
+        environ: Environment dictionary to use (defaults to os.environ).
 
     Returns:
         The value with substitutions applied.
     """
-    if posargs is None:
-        posargs = []
     if config is None:
         config = {}
+    if posargs is None:
+        posargs = []
+    if environ is None:
+        environ = dict(os.environ)
 
     if isinstance(value, str):
-        return substitute_string(value, posargs, config)
+        return substitute_string(value, config=config, posargs=posargs, environ=environ)
 
     if isinstance(value, list):
         result = []
         for item in value:
             if _is_toml_inline_substitution(item):
-                resolved, extend = _resolve_toml_inline_substitution(item, posargs, config)
+                resolved, extend = _resolve_toml_inline_substitution(item, config, posargs, environ)
                 if extend and isinstance(resolved, list):
                     # Extend the result list with resolved items
-                    result.extend(substitute_value(r, posargs, config) for r in resolved)
+                    result.extend(substitute_value(r, config=config, posargs=posargs, environ=environ) for r in resolved)
                 else:
-                    result.append(substitute_value(resolved, posargs, config))
+                    result.append(substitute_value(resolved, config=config, posargs=posargs, environ=environ))
             else:
-                result.append(substitute_value(item, posargs, config))
+                result.append(substitute_value(item, config=config, posargs=posargs, environ=environ))
         return result
 
     if isinstance(value, dict):
         # Check if this dict is an inline substitution at the top level
         if _is_toml_inline_substitution(value):
-            resolved, _ = _resolve_toml_inline_substitution(value, posargs, config)
-            return substitute_value(resolved, posargs, config)
-        return {k: substitute_value(v, posargs, config) for k, v in value.items()}
+            resolved, _ = _resolve_toml_inline_substitution(value, config, posargs, environ)
+            return substitute_value(resolved, config=config, posargs=posargs, environ=environ)
+        return {k: substitute_value(v, config=config, posargs=posargs, environ=environ) for k, v in value.items()}
 
     # For other types (int, bool, None, etc.), return as-is
     return value
@@ -640,7 +665,9 @@ def substitute_value(
 
 def substitute_config(
     config: dict[str, Any],
+    *,
     posargs: list[str] | None = None,
+    environ: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """
     Perform substitutions on an entire tox configuration dictionary.
@@ -652,6 +679,7 @@ def substitute_config(
     Args:
         config: The configuration dictionary from read_config().
         posargs: Positional arguments provided by the user (e.g., from CLI).
+        environ: Environment dictionary to use (defaults to os.environ).
 
     Returns:
         A new dictionary with all substitutions resolved.
@@ -664,6 +692,8 @@ def substitute_config(
     """
     if posargs is None:
         posargs = []
+    if environ is None:
+        environ = dict(os.environ)
 
-    return substitute_value(config, posargs, config)
+    return substitute_value(config, config=config, posargs=posargs, environ=environ)
 

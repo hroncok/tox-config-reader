@@ -35,36 +35,38 @@ class TestSubstituteString:
 
 
 class TestEnvSubstitution:
-    def test_env_existing(self, monkeypatch):
-        monkeypatch.setenv("TEST_VAR", "test_value")
-        result = substitute_string("{env:TEST_VAR}")
+    def test_env_existing(self):
+        result = substitute_string("{env:TEST_VAR}", environ={"TEST_VAR": "test_value"})
         assert result == "test_value"
 
-    def test_env_nonexistent(self, monkeypatch):
-        monkeypatch.delenv("NONEXISTENT_VAR", raising=False)
-        result = substitute_string("{env:NONEXISTENT_VAR}")
+    def test_env_nonexistent(self):
+        result = substitute_string("{env:NONEXISTENT_VAR}", environ={})
         assert result == ""
 
-    def test_env_with_default(self, monkeypatch):
-        monkeypatch.delenv("NONEXISTENT_VAR", raising=False)
-        result = substitute_string("{env:NONEXISTENT_VAR:default_value}")
+    def test_env_with_default(self):
+        result = substitute_string("{env:NONEXISTENT_VAR:default_value}", environ={})
         assert result == "default_value"
 
-    def test_env_existing_ignores_default(self, monkeypatch):
-        monkeypatch.setenv("TEST_VAR", "actual_value")
-        result = substitute_string("{env:TEST_VAR:default_value}")
+    def test_env_existing_ignores_default(self):
+        result = substitute_string("{env:TEST_VAR:default_value}", environ={"TEST_VAR": "actual_value"})
         assert result == "actual_value"
 
-    def test_env_empty_default(self, monkeypatch):
-        monkeypatch.delenv("NONEXISTENT_VAR", raising=False)
-        result = substitute_string("{env:NONEXISTENT_VAR:}")
+    def test_env_empty_default(self):
+        result = substitute_string("{env:NONEXISTENT_VAR:}", environ={})
         assert result == ""
 
-    def test_env_nested_default(self, monkeypatch):
-        monkeypatch.delenv("PRIMARY_VAR", raising=False)
-        monkeypatch.setenv("FALLBACK_VAR", "fallback_value")
-        result = substitute_string("{env:PRIMARY_VAR:{env:FALLBACK_VAR}}")
+    def test_env_nested_default(self):
+        result = substitute_string(
+            "{env:PRIMARY_VAR:{env:FALLBACK_VAR}}",
+            environ={"FALLBACK_VAR": "fallback_value"}
+        )
         assert result == "fallback_value"
+
+    def test_env_uses_os_environ_by_default(self, monkeypatch):
+        """Sanity check that os.environ is used when environ is not specified."""
+        monkeypatch.setenv("SANITY_CHECK_VAR", "sanity_value")
+        result = substitute_string("{env:SANITY_CHECK_VAR}")
+        assert result == "sanity_value"
 
 
 class TestPosargsSubstitution:
@@ -172,9 +174,11 @@ class TestTtySubstitution:
 
 
 class TestMultipleSubstitutions:
-    def test_multiple_in_one_string(self, monkeypatch):
-        monkeypatch.setenv("USER", "testuser")
-        result = substitute_string("Hello {env:USER}, path is src{/}main")
+    def test_multiple_in_one_string(self):
+        result = substitute_string(
+            "Hello {env:USER}, path is src{/}main",
+            environ={"USER": "testuser"}
+        )
         assert result == f"Hello testuser, path is src{os.sep}main"
 
     def test_adjacent_substitutions(self):
@@ -195,9 +199,8 @@ class TestSubstituteValue:
         result = substitute_value([["pytest", "{posargs}"]], posargs=["-v"])
         assert result == [["pytest", "-v"]]
 
-    def test_dict(self, monkeypatch):
-        monkeypatch.setenv("MY_VAR", "my_value")
-        result = substitute_value({"key": "{env:MY_VAR}"})
+    def test_dict(self):
+        result = substitute_value({"key": "{env:MY_VAR}"}, environ={"MY_VAR": "my_value"})
         assert result == {"key": "my_value"}
 
     def test_nested_dict(self):
@@ -220,8 +223,7 @@ class TestSubstituteValue:
 
 
 class TestSubstituteConfig:
-    def test_full_config(self, monkeypatch):
-        monkeypatch.setenv("PYTHON_VERSION", "3.11")
+    def test_full_config(self):
         config = {
             "env_list": ["py{env:PYTHON_VERSION}"],
             "env_run_base": {
@@ -229,7 +231,11 @@ class TestSubstituteConfig:
                 "commands": [["pytest", "{posargs}"]]
             }
         }
-        result = substitute_config(config, posargs=["tests/", "-v"])
+        result = substitute_config(
+            config,
+            posargs=["tests/", "-v"],
+            environ={"PYTHON_VERSION": "3.11"}
+        )
         assert result == {
             "env_list": ["py3.11"],
             "env_run_base": {
@@ -445,20 +451,18 @@ class TestTOMLInlineSubstitution:
         result = substitute_config(config, posargs=[])
         assert result["commands"] == [["pytest"]]
 
-    def test_env_inline_basic(self, monkeypatch):
-        monkeypatch.setenv("MY_VAR", "my_value")
+    def test_env_inline_basic(self):
         config = {
             "commands": [["echo", {"replace": "env", "name": "MY_VAR"}]]
         }
-        result = substitute_config(config)
+        result = substitute_config(config, environ={"MY_VAR": "my_value"})
         assert result["commands"] == [["echo", "my_value"]]
 
-    def test_env_inline_with_default(self, monkeypatch):
-        monkeypatch.delenv("NONEXISTENT", raising=False)
+    def test_env_inline_with_default(self):
         config = {
             "commands": [["echo", {"replace": "env", "name": "NONEXISTENT", "default": "fallback"}]]
         }
-        result = substitute_config(config)
+        result = substitute_config(config, environ={})
         assert result["commands"] == [["echo", "fallback"]]
 
     def test_inline_substitution_in_nested_list(self):
@@ -497,7 +501,7 @@ class TestTOMLInlineSubstitution:
             }
         }
         result = substitute_config(config)
-        assert result["env"]["lint"]["deps"] == [["pytest", "coverage"]]
+        assert result["env"]["lint"]["deps"] == ["pytest", "coverage"]
 
     def test_ref_inline_extend(self):
         config = {
@@ -547,7 +551,7 @@ class TestTOMLInlineSubstitution:
             }
         }
         result = substitute_config(config)
-        assert result["env"]["extended"]["commands"] == [[["pytest"]]]
+        assert result["env"]["extended"]["commands"] == [["pytest"]]
 
     def test_ref_inline_nested_path_extend(self):
         config = {
