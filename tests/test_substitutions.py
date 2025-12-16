@@ -1,7 +1,6 @@
 """Tests for tox_config_reader.substitutions module."""
 
 import os
-import pytest
 
 from tox_config_reader.substitutions import (
     substitute_string,
