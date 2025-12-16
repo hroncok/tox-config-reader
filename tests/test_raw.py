@@ -36,7 +36,9 @@ def get_fixture_ids():
 
 
 # Parametrized test for all config fixtures
-@pytest.mark.parametrize("config_dir", discover_config_fixtures(), ids=get_fixture_ids())
+@pytest.mark.parametrize(
+    "config_dir", discover_config_fixtures(), ids=get_fixture_ids()
+)
 class TestConfigFixtures:
     def test_read_config_matches_expected(self, config_dir):
         """Test that read_config returns the expected normalized structure."""
@@ -167,7 +169,10 @@ class TestPyprojectLegacyINIConfigReader:
         assert PyprojectLegacyINIConfigReader.can_read(path) is False
 
     def test_can_read_nonexistent_file(self, tmp_path):
-        assert PyprojectLegacyINIConfigReader.can_read(tmp_path / "pyproject.toml") is False
+        assert (
+            PyprojectLegacyINIConfigReader.can_read(tmp_path / "pyproject.toml")
+            is False
+        )
 
 
 class TestFindConfigFile:
@@ -217,7 +222,9 @@ class TestConfigPriority:
 
     def test_pyproject_legacy_over_native(self, tmp_path):
         """legacy_tox_ini takes priority over native pyproject.toml format."""
-        (tmp_path / "pyproject.toml").write_text('[tool.tox]\nlegacy_tox_ini = "[tox]"\n')
+        (tmp_path / "pyproject.toml").write_text(
+            '[tool.tox]\nlegacy_tox_ini = "[tox]"\n'
+        )
 
         path, reader_class = find_config_file(tmp_path)
         assert reader_class is PyprojectLegacyINIConfigReader

@@ -98,7 +98,7 @@ def _find_substitutions(text: str) -> list[tuple[int, int, str]]:
         if text[i] == "{":
             end = _find_matching_brace(text, i)
             if end is not None:
-                expr = text[i + 1:end]
+                expr = text[i + 1 : end]
                 results.append((i, end + 1, expr))
                 i = end + 1
                 continue
@@ -232,7 +232,7 @@ def _resolve_ini_section_reference(
     """
     # Handle testenv:envname references
     if section.startswith("testenv:"):
-        env_name = section[len("testenv:"):]
+        env_name = section[len("testenv:") :]
         env_config = config.get("env", {}).get(env_name, {})
         if key in env_config:
             value = env_config[key]
@@ -409,7 +409,7 @@ def _substitute_single(
         bracket_end = expr.find("]")
         if bracket_end > 1:
             section = expr[1:bracket_end]
-            key = expr[bracket_end + 1:]
+            key = expr[bracket_end + 1 :]
             if key:
                 result = _resolve_ini_section_reference(section, key, config)
                 if result is not None:
@@ -432,7 +432,9 @@ def _substitute_single(
         default = args[1] if len(args) > 1 else None
         # Recursively substitute the default value
         if default is not None:
-            default = substitute_string(default, config=config, posargs=posargs, environ=environ)
+            default = substitute_string(
+                default, config=config, posargs=posargs, environ=environ
+            )
         return _substitute_env(key, default, environ)
 
     # Handle posargs with optional index: {posargs}, {posargs[0]}, {posargs[1:]}
@@ -449,7 +451,9 @@ def _substitute_single(
         default = args[0] if args else None
         # Recursively substitute the default value
         if default is not None:
-            default = substitute_string(default, config=config, posargs=posargs, environ=environ)
+            default = substitute_string(
+                default, config=config, posargs=posargs, environ=environ
+            )
         return _substitute_posargs(posargs, default)
 
     if sub_type == "tty":
@@ -642,22 +646,44 @@ def substitute_value(
         result = []
         for item in value:
             if _is_toml_inline_substitution(item):
-                resolved, extend = _resolve_toml_inline_substitution(item, config, posargs, environ)
+                resolved, extend = _resolve_toml_inline_substitution(
+                    item, config, posargs, environ
+                )
                 if extend and isinstance(resolved, list):
                     # Extend the result list with resolved items
-                    result.extend(substitute_value(r, config=config, posargs=posargs, environ=environ) for r in resolved)
+                    result.extend(
+                        substitute_value(
+                            r, config=config, posargs=posargs, environ=environ
+                        )
+                        for r in resolved
+                    )
                 else:
-                    result.append(substitute_value(resolved, config=config, posargs=posargs, environ=environ))
+                    result.append(
+                        substitute_value(
+                            resolved, config=config, posargs=posargs, environ=environ
+                        )
+                    )
             else:
-                result.append(substitute_value(item, config=config, posargs=posargs, environ=environ))
+                result.append(
+                    substitute_value(
+                        item, config=config, posargs=posargs, environ=environ
+                    )
+                )
         return result
 
     if isinstance(value, dict):
         # Check if this dict is an inline substitution at the top level
         if _is_toml_inline_substitution(value):
-            resolved, _ = _resolve_toml_inline_substitution(value, config, posargs, environ)
-            return substitute_value(resolved, config=config, posargs=posargs, environ=environ)
-        return {k: substitute_value(v, config=config, posargs=posargs, environ=environ) for k, v in value.items()}
+            resolved, _ = _resolve_toml_inline_substitution(
+                value, config, posargs, environ
+            )
+            return substitute_value(
+                resolved, config=config, posargs=posargs, environ=environ
+            )
+        return {
+            k: substitute_value(v, config=config, posargs=posargs, environ=environ)
+            for k, v in value.items()
+        }
 
     # For other types (int, bool, None, etc.), return as-is
     return value
@@ -696,4 +722,3 @@ def substitute_config(
         environ = os.environ
 
     return substitute_value(config, config=config, posargs=posargs, environ=environ)
-

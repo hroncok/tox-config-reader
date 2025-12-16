@@ -136,7 +136,7 @@ class INIConfigReader(BaseConfigReader):
         env: dict[str, Any] = {}
         for section, values in raw.items():
             if section.startswith("testenv:"):
-                env_name = section[len("testenv:"):]
+                env_name = section[len("testenv:") :]
                 env[env_name] = values
 
         if env:
@@ -305,7 +305,9 @@ CONFIG_READERS: dict[str, list[type[BaseConfigReader]]] = {
 }
 
 
-def find_config_file(directory: Path | None = None) -> tuple[Path, type[BaseConfigReader]]:
+def find_config_file(
+    directory: Path | None = None,
+) -> tuple[Path, type[BaseConfigReader]]:
     """
     Find the tox configuration file in the given directory.
 

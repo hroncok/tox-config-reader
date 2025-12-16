@@ -35,12 +35,19 @@ Homepage = "https://github.com/hroncok/tox-config-reader"
 test = [
     "pytest>=7.0",
 ]
+lint = [
+    "ruff>=0.8",
+]
 
 [tool.tox]
 requires = ["tox>=4.21"]
-env_list = ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]
+env_list = ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14", "3.15", "lint"]
 
 [tool.tox.env_run_base]
 dependency_groups = ["test"]
 commands = [["pytest"]]
+
+[tool.tox.env.lint]
+dependency_groups = ["lint"]
+commands = [["ruff", "check", "src", "tests"], ["ruff", "format", "--check", "src", "tests"]]
 

@@ -47,7 +47,9 @@ class TestEnvSubstitution:
         assert result == "default_value"
 
     def test_env_existing_ignores_default(self):
-        result = substitute_string("{env:TEST_VAR:default_value}", environ={"TEST_VAR": "actual_value"})
+        result = substitute_string(
+            "{env:TEST_VAR:default_value}", environ={"TEST_VAR": "actual_value"}
+        )
         assert result == "actual_value"
 
     def test_env_empty_default(self):
@@ -57,7 +59,7 @@ class TestEnvSubstitution:
     def test_env_nested_default(self):
         result = substitute_string(
             "{env:PRIMARY_VAR:{env:FALLBACK_VAR}}",
-            environ={"FALLBACK_VAR": "fallback_value"}
+            environ={"FALLBACK_VAR": "fallback_value"},
         )
         assert result == "fallback_value"
 
@@ -130,7 +132,9 @@ class TestPosargsIndexed:
         assert result == "arg1 arg2"
 
     def test_posargs_slice_range(self):
-        result = substitute_string("{posargs[1:3]}", posargs=["arg1", "arg2", "arg3", "arg4"])
+        result = substitute_string(
+            "{posargs[1:3]}", posargs=["arg1", "arg2", "arg3", "arg4"]
+        )
         assert result == "arg2 arg3"
 
     def test_posargs_slice_empty(self):
@@ -144,7 +148,7 @@ class TestPosargsIndexed:
     def test_posargs_index_in_command(self):
         result = substitute_string(
             "python {posargs[0]} --config {posargs[1]}",
-            posargs=["script.py", "config.ini", "extra"]
+            posargs=["script.py", "config.ini", "extra"],
         )
         assert result == "python script.py --config config.ini"
 
@@ -175,8 +179,7 @@ class TestTtySubstitution:
 class TestMultipleSubstitutions:
     def test_multiple_in_one_string(self):
         result = substitute_string(
-            "Hello {env:USER}, path is src{/}main",
-            environ={"USER": "testuser"}
+            "Hello {env:USER}, path is src{/}main", environ={"USER": "testuser"}
         )
         assert result == f"Hello testuser, path is src{os.sep}main"
 
@@ -199,20 +202,17 @@ class TestSubstituteValue:
         assert result == [["pytest", "-v"]]
 
     def test_dict(self):
-        result = substitute_value({"key": "{env:MY_VAR}"}, environ={"MY_VAR": "my_value"})
+        result = substitute_value(
+            {"key": "{env:MY_VAR}"}, environ={"MY_VAR": "my_value"}
+        )
         assert result == {"key": "my_value"}
 
     def test_nested_dict(self):
-        result = substitute_value({
-            "env_run_base": {
-                "commands": [["pytest", "{posargs}"]]
-            }
-        }, posargs=["--verbose"])
-        assert result == {
-            "env_run_base": {
-                "commands": [["pytest", "--verbose"]]
-            }
-        }
+        result = substitute_value(
+            {"env_run_base": {"commands": [["pytest", "{posargs}"]]}},
+            posargs=["--verbose"],
+        )
+        assert result == {"env_run_base": {"commands": [["pytest", "--verbose"]]}}
 
     def test_non_string_passthrough(self):
         assert substitute_value(42) == 42
@@ -225,30 +225,18 @@ class TestSubstituteConfig:
     def test_full_config(self):
         config = {
             "env_list": ["py{env:PYTHON_VERSION}"],
-            "env_run_base": {
-                "deps": ["pytest"],
-                "commands": [["pytest", "{posargs}"]]
-            }
+            "env_run_base": {"deps": ["pytest"], "commands": [["pytest", "{posargs}"]]},
         }
         result = substitute_config(
-            config,
-            posargs=["tests/", "-v"],
-            environ={"PYTHON_VERSION": "3.11"}
+            config, posargs=["tests/", "-v"], environ={"PYTHON_VERSION": "3.11"}
         )
         assert result == {
             "env_list": ["py3.11"],
-            "env_run_base": {
-                "deps": ["pytest"],
-                "commands": [["pytest", "tests/ -v"]]
-            }
+            "env_run_base": {"deps": ["pytest"], "commands": [["pytest", "tests/ -v"]]},
         }
 
     def test_pathsep_in_config(self):
-        config = {
-            "set_env": {
-                "PATH": "bin{:}usr/bin"
-            }
-        }
+        config = {"set_env": {"PATH": "bin{:}usr/bin"}}
         result = substitute_config(config)
         assert result["set_env"]["PATH"] == f"bin{os.pathsep}usr/bin"
 
@@ -284,7 +272,7 @@ class TestINISectionReference:
                     "deps": "ruff",
                     "commands": "ruff check src",
                 }
-            }
+            },
         }
         result = substitute_string("{[testenv:lint]deps}", config=config)
         assert result == "ruff"
@@ -299,7 +287,7 @@ class TestINISectionReference:
                 "lint": {
                     "deps": "ruff",
                 }
-            }
+            },
         }
         # lint doesn't have base_option, should fall back to env_run_base
         result = substitute_string("{[testenv:lint]base_option}", config=config)
@@ -349,15 +337,7 @@ class TestTOMLDottedReference:
         assert result == "ruff"
 
     def test_deep_dotted_reference(self):
-        config = {
-            "level1": {
-                "level2": {
-                    "level3": {
-                        "value": "deep_value"
-                    }
-                }
-            }
-        }
+        config = {"level1": {"level2": {"level3": {"value": "deep_value"}}}}
         result = substitute_string("{level1.level2.level3.value}", config=config)
         assert result == "deep_value"
 
@@ -385,7 +365,7 @@ class TestConfigReferenceInConfig:
             "base_deps": "pytest",
             "env_run_base": {
                 "deps": "{base_deps}",
-            }
+            },
         }
         result = substitute_config(config)
         assert result["env_run_base"]["deps"] == "pytest"
@@ -399,7 +379,7 @@ class TestConfigReferenceInConfig:
                 "lint": {
                     "also_deps": "Deps are: {env_run_base.deps}",
                 }
-            }
+            },
         }
         result = substitute_config(config)
         assert result["env"]["lint"]["also_deps"] == "Deps are: pytest"
@@ -409,9 +389,7 @@ class TestTOMLInlineSubstitution:
     """Test TOML inline table substitutions like { replace = "posargs", ... }."""
 
     def test_posargs_inline_basic(self):
-        config = {
-            "commands": [["python", {"replace": "posargs"}]]
-        }
+        config = {"commands": [["python", {"replace": "posargs"}]]}
         result = substitute_config(config, posargs=["script.py", "--verbose"])
         assert result["commands"] == [["python", "script.py --verbose"]]
 
@@ -431,35 +409,39 @@ class TestTOMLInlineSubstitution:
 
     def test_posargs_inline_extend(self):
         config = {
-            "commands": [["python", {"replace": "posargs", "default": ["a", "b"], "extend": True}]]
+            "commands": [
+                [
+                    "python",
+                    {"replace": "posargs", "default": ["a", "b"], "extend": True},
+                ]
+            ]
         }
         result = substitute_config(config, posargs=[])
         assert result["commands"] == [["python", "a", "b"]]
 
     def test_posargs_inline_extend_with_posargs(self):
-        config = {
-            "commands": [["pytest", {"replace": "posargs", "extend": True}]]
-        }
+        config = {"commands": [["pytest", {"replace": "posargs", "extend": True}]]}
         result = substitute_config(config, posargs=["tests/", "-v"])
         assert result["commands"] == [["pytest", "tests/", "-v"]]
 
     def test_posargs_inline_extend_empty(self):
-        config = {
-            "commands": [["pytest", {"replace": "posargs", "extend": True}]]
-        }
+        config = {"commands": [["pytest", {"replace": "posargs", "extend": True}]]}
         result = substitute_config(config, posargs=[])
         assert result["commands"] == [["pytest"]]
 
     def test_env_inline_basic(self):
-        config = {
-            "commands": [["echo", {"replace": "env", "name": "MY_VAR"}]]
-        }
+        config = {"commands": [["echo", {"replace": "env", "name": "MY_VAR"}]]}
         result = substitute_config(config, environ={"MY_VAR": "my_value"})
         assert result["commands"] == [["echo", "my_value"]]
 
     def test_env_inline_with_default(self):
         config = {
-            "commands": [["echo", {"replace": "env", "name": "NONEXISTENT", "default": "fallback"}]]
+            "commands": [
+                [
+                    "echo",
+                    {"replace": "env", "name": "NONEXISTENT", "default": "fallback"},
+                ]
+            ]
         }
         result = substitute_config(config, environ={})
         assert result["commands"] == [["echo", "fallback"]]
@@ -468,7 +450,10 @@ class TestTOMLInlineSubstitution:
         config = {
             "env_run_base": {
                 "commands": [
-                    ["pytest", {"replace": "posargs", "default": ["tests"], "extend": True}]
+                    [
+                        "pytest",
+                        {"replace": "posargs", "default": ["tests"], "extend": True},
+                    ]
                 ]
             }
         }
@@ -490,28 +475,29 @@ class TestTOMLInlineSubstitution:
 
     def test_ref_inline_basic(self):
         config = {
-            "env_run_base": {
-                "deps": ["pytest", "coverage"]
-            },
+            "env_run_base": {"deps": ["pytest", "coverage"]},
             "env": {
-                "lint": {
-                    "deps": [{"replace": "ref", "of": ["env_run_base", "deps"]}]
-                }
-            }
+                "lint": {"deps": [{"replace": "ref", "of": ["env_run_base", "deps"]}]}
+            },
         }
         result = substitute_config(config)
         assert result["env"]["lint"]["deps"] == ["pytest", "coverage"]
 
     def test_ref_inline_extend(self):
         config = {
-            "env_run_base": {
-                "deps": ["pytest", "coverage"]
-            },
+            "env_run_base": {"deps": ["pytest", "coverage"]},
             "env": {
                 "lint": {
-                    "deps": [{"replace": "ref", "of": ["env_run_base", "deps"], "extend": True}, "ruff"]
+                    "deps": [
+                        {
+                            "replace": "ref",
+                            "of": ["env_run_base", "deps"],
+                            "extend": True,
+                        },
+                        "ruff",
+                    ]
                 }
-            }
+            },
         }
         result = substitute_config(config)
         assert result["env"]["lint"]["deps"] == ["pytest", "coverage", "ruff"]
@@ -520,7 +506,13 @@ class TestTOMLInlineSubstitution:
         config = {
             "env": {
                 "lint": {
-                    "deps": [{"replace": "ref", "of": ["nonexistent", "key"], "default": "fallback-dep"}]
+                    "deps": [
+                        {
+                            "replace": "ref",
+                            "of": ["nonexistent", "key"],
+                            "default": "fallback-dep",
+                        }
+                    ]
                 }
             }
         }
@@ -531,7 +523,14 @@ class TestTOMLInlineSubstitution:
         config = {
             "env": {
                 "lint": {
-                    "deps": [{"replace": "ref", "of": ["nonexistent"], "default": ["a", "b"], "extend": True}]
+                    "deps": [
+                        {
+                            "replace": "ref",
+                            "of": ["nonexistent"],
+                            "default": ["a", "b"],
+                            "extend": True,
+                        }
+                    ]
                 }
             }
         }
@@ -541,12 +540,10 @@ class TestTOMLInlineSubstitution:
     def test_ref_inline_nested_path(self):
         config = {
             "env": {
-                "base": {
-                    "commands": [["pytest"]]
-                },
+                "base": {"commands": [["pytest"]]},
                 "extended": {
                     "commands": [{"replace": "ref", "of": ["env", "base", "commands"]}]
-                }
+                },
             }
         }
         result = substitute_config(config)
@@ -555,12 +552,16 @@ class TestTOMLInlineSubstitution:
     def test_ref_inline_nested_path_extend(self):
         config = {
             "env": {
-                "base": {
-                    "commands": [["pytest"]]
-                },
+                "base": {"commands": [["pytest"]]},
                 "extended": {
-                    "commands": [{"replace": "ref", "of": ["env", "base", "commands"], "extend": True}]
-                }
+                    "commands": [
+                        {
+                            "replace": "ref",
+                            "of": ["env", "base", "commands"],
+                            "extend": True,
+                        }
+                    ]
+                },
             }
         }
         result = substitute_config(config)
@@ -569,9 +570,7 @@ class TestTOMLInlineSubstitution:
     def test_ref_inline_string_value(self):
         config = {
             "base_python": "python3.11",
-            "env_run_base": {
-                "base_python": {"replace": "ref", "of": ["base_python"]}
-            }
+            "env_run_base": {"base_python": {"replace": "ref", "of": ["base_python"]}},
         }
         result = substitute_config(config)
         assert result["env_run_base"]["base_python"] == "python3.11"
@@ -591,15 +590,7 @@ class TestEdgeCases:
         assert result == ""
 
     def test_deeply_nested_structure(self):
-        config = {
-            "level1": {
-                "level2": {
-                    "level3": [
-                        {"level4": "value{/}here"}
-                    ]
-                }
-            }
-        }
+        config = {"level1": {"level2": {"level3": [{"level4": "value{/}here"}]}}}
         result = substitute_config(config)
         assert result["level1"]["level2"]["level3"][0]["level4"] == f"value{os.sep}here"
 
@@ -610,4 +601,3 @@ class TestEdgeCases:
     def test_empty_section_reference(self):
         result = substitute_string("{[]key}", config={})
         assert result == "{[]key}"
-

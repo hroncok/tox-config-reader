@@ -11,4 +11,3 @@ __all__ = [
     "read_config",
     "substitute_config",
 ]
-
