@@ -693,7 +693,7 @@ def substitute_config(
     if posargs is None:
         posargs = []
     if environ is None:
-        environ = dict(os.environ)
+        environ = os.environ
 
     return substitute_value(config, config=config, posargs=posargs, environ=environ)
 
